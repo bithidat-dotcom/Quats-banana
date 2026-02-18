@@ -1,21 +1,15 @@
 import { GoogleGenAI } from "@google/genai";
 import { AspectRatio } from "../types";
 
-// Initialize the client. 
-// NOTE: We assume process.env.API_KEY is available as per instructions.
-// In a real build, this would be injected by the environment.
-const apiKey = process.env.API_KEY || ''; 
-// We handle empty key gracefully in the UI, but the SDK needs a string.
-
 export const generateImageWithGemini = async (
   prompt: string, 
   aspectRatio: AspectRatio
 ): Promise<string> => {
-  if (!apiKey) {
+  if (!process.env.API_KEY) {
     throw new Error("API Key is missing. Please configure your environment.");
   }
 
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
   try {
     // Using the "Nano Banana" equivalent model: gemini-2.5-flash-image
@@ -29,7 +23,6 @@ export const generateImageWithGemini = async (
       config: {
         imageConfig: {
           aspectRatio: aspectRatio,
-          // count: 1 // Default is 1, not strictly needed but good for clarity if supported by SDK types
         }
       },
     });
@@ -46,11 +39,11 @@ export const editImageWithGemini = async (
   base64Image: string,
   prompt: string
 ): Promise<string> => {
-  if (!apiKey) {
+  if (!process.env.API_KEY) {
     throw new Error("API Key is missing.");
   }
 
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
   // Extract raw base64 and mimeType from data URL
   const matches = base64Image.match(/^data:(.+);base64,(.+)$/);
