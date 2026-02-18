@@ -4,7 +4,7 @@ import { Generator } from './components/Generator';
 import { Gallery } from './components/Gallery';
 import { Editor } from './components/Editor';
 import { GeneratedImage, ViewMode } from './types';
-import { ExternalLink, Palette, Sparkles, LayoutGrid } from 'lucide-react';
+import { Palette, Sparkles } from 'lucide-react';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewMode>('generate');
@@ -67,8 +67,10 @@ const App: React.FC = () => {
         {currentView === 'editor' && selectedImage && (
           <Editor 
             image={selectedImage} 
+            allImages={images}
             onBack={() => setCurrentView('gallery')}
             onImageSave={handleImageGenerated}
+            onSelectHistoryImage={handleSelectImage}
           />
         )}
         

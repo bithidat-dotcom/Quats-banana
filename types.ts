@@ -7,6 +7,7 @@ export interface GeneratedImage {
   aspectRatio: string;
   timestamp: number;
   model: string;
+  parentId?: string; // ID of the image this was generated/edited from
 }
 
 export type AspectRatio = "1:1" | "3:4" | "4:3" | "9:16" | "16:9";

@@ -1,36 +1,88 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { GeneratedImage } from '../types';
 import { Button } from './Button';
-import { Download, ArrowLeft, Move, Type as TypeIcon, Wand2, Paintbrush, Layers, AlertCircle } from 'lucide-react';
+import { Download, ArrowLeft, Move, Type as TypeIcon, Wand2, Paintbrush, Layers, AlertCircle, History, Sliders, Sun, Contrast, Palette } from 'lucide-react';
 import { editImageWithGemini } from '../services/geminiService';
 
 interface EditorProps {
   image: GeneratedImage;
+  allImages?: GeneratedImage[];
   onBack: () => void;
   onImageSave: (image: GeneratedImage) => void;
+  onSelectHistoryImage?: (image: GeneratedImage) => void;
 }
 
-type EditorMode = 'canvas' | 'ai';
+type EditorMode = 'canvas' | 'filters' | 'ai' | 'history';
 
 const generateId = () => Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 
-export const Editor: React.FC<EditorProps> = ({ image, onBack, onImageSave }) => {
-  const [mode, setMode] = useState<EditorMode>('canvas');
+export const Editor: React.FC<EditorProps> = ({ image, allImages = [], onBack, onImageSave, onSelectHistoryImage }) => {
+  const [mode, setMode] = useState<EditorMode>('ai');
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
-  // Canvas State
+  // Canvas Text State
   const [text, setText] = useState('');
   const [fontSize, setFontSize] = useState(48);
   const [textColor, setTextColor] = useState('#ffffff');
   const [textPos, setTextPos] = useState({ x: 50, y: 50 }); // Percentage
   
+  // Filter State
+  const [filters, setFilters] = useState({
+    brightness: 100,
+    contrast: 100,
+    grayscale: 0,
+    sepia: 0,
+    saturate: 100,
+  });
+
   // AI Edit State
   const [editPrompt, setEditPrompt] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Initialize Canvas
+  // Compute history lineage
+  const historyLineage = useMemo(() => {
+    const lineage: GeneratedImage[] = [];
+    const visited = new Set<string>();
+    
+    // Simple approach: Find all images that are in the same 'tree'
+    // For a robust tree, we'd need a recursive search up and down.
+    // Let's just find the path UP from current, and any immediate children of current.
+    
+    // 1. Trace back parents
+    let curr: GeneratedImage | undefined = image;
+    while (curr) {
+      if (visited.has(curr.id)) break;
+      visited.add(curr.id);
+      lineage.unshift(curr);
+      if (curr.parentId) {
+        const parentId = curr.parentId; // capture for closure
+        curr = allImages.find(img => img.id === parentId);
+      } else {
+        curr = undefined;
+      }
+    }
+
+    // 2. Find children of the current image (one level down for simplicity in this view)
+    const children = allImages.filter(img => img.parentId === image.id);
+    children.forEach(child => {
+        if (!visited.has(child.id)) {
+            lineage.push(child);
+        }
+    });
+    
+    // Sort by timestamp to make a clean timeline
+    return lineage.sort((a, b) => a.timestamp - b.timestamp);
+  }, [image, allImages]);
+
+
+  // Initialize and Draw Canvas
   useEffect(() => {
+    drawCanvas();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [image.url, text, fontSize, textColor, textPos, filters]);
+
+  const drawCanvas = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -43,43 +95,31 @@ export const Editor: React.FC<EditorProps> = ({ image, onBack, onImageSave }) =>
     img.onload = () => {
       canvas.width = img.naturalWidth;
       canvas.height = img.naturalHeight;
-      drawCanvas();
+      
+      // Apply filters
+      ctx.filter = `brightness(${filters.brightness}%) contrast(${filters.contrast}%) grayscale(${filters.grayscale}%) sepia(${filters.sepia}%) saturate(${filters.saturate}%)`;
+      
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0);
+      
+      // Reset filter for text
+      ctx.filter = 'none';
+
+      if (text) {
+        ctx.fillStyle = textColor;
+        ctx.font = `bold ${fontSize}px Inter, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.shadowColor = 'rgba(0,0,0,0.7)';
+        ctx.shadowBlur = 10;
+        ctx.shadowOffsetX = 2;
+        ctx.shadowOffsetY = 2;
+
+        const x = (canvas.width * textPos.x) / 100;
+        const y = (canvas.height * textPos.y) / 100;
+
+        ctx.fillText(text, x, y);
+      }
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [image.url]);
-
-  // Redraw when properties change
-  useEffect(() => {
-    drawCanvas();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [text, fontSize, textColor, textPos, mode]);
-
-  const drawCanvas = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const img = new Image();
-    img.src = image.url;
-    
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(img, 0, 0);
-
-    if (text && mode === 'canvas') {
-      ctx.fillStyle = textColor;
-      ctx.font = `bold ${fontSize}px Inter, sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.shadowColor = 'rgba(0,0,0,0.7)';
-      ctx.shadowBlur = 10;
-      ctx.shadowOffsetX = 2;
-      ctx.shadowOffsetY = 2;
-
-      const x = (canvas.width * textPos.x) / 100;
-      const y = (canvas.height * textPos.y) / 100;
-
-      ctx.fillText(text, x, y);
-    }
   };
 
   const handleDownload = () => {
@@ -110,21 +150,26 @@ export const Editor: React.FC<EditorProps> = ({ image, onBack, onImageSave }) =>
     setError(null);
 
     try {
-      // For editing, we send the current raw image (without canvas text) to the API
-      const newImageUrl = await editImageWithGemini(image.url, editPrompt);
+      // Get current canvas state as base64 for the edit source
+      // This allows filters and text to be "baked in" to the AI edit if desired
+      // OR we can just use the raw image.url. 
+      // Using canvasRef allows chaining edits (e.g. filter -> AI edit).
+      const sourceImage = canvasRef.current ? canvasRef.current.toDataURL('image/png') : image.url;
+
+      const newImageUrl = await editImageWithGemini(sourceImage, editPrompt);
       
       const newImage: GeneratedImage = {
         id: generateId(),
         url: newImageUrl,
-        prompt: `Edit of "${image.prompt}": ${editPrompt}`,
-        aspectRatio: image.aspectRatio, // Persist aspect ratio logic
+        prompt: `Edit: ${editPrompt}`,
+        aspectRatio: image.aspectRatio,
         timestamp: Date.now(),
-        model: 'gemini-2.5-flash-image'
+        model: 'gemini-2.5-flash-image',
+        parentId: image.id // Link to current image
       };
 
       onImageSave(newImage);
       setEditPrompt('');
-      // Mode will stay AI or switch to canvas? Let's stay in AI to see result, or user can switch.
     } catch (err: any) {
       setError(err.message || "Failed to edit image");
     } finally {
@@ -132,10 +177,20 @@ export const Editor: React.FC<EditorProps> = ({ image, onBack, onImageSave }) =>
     }
   };
 
+  const resetFilters = () => {
+    setFilters({
+      brightness: 100,
+      contrast: 100,
+      grayscale: 0,
+      sepia: 0,
+      saturate: 100,
+    });
+  };
+
   return (
     <div className="h-full flex flex-col lg:flex-row gap-6 animate-fade-in">
       {/* Sidebar Controls */}
-      <div className="w-full lg:w-80 flex flex-col gap-6 order-2 lg:order-1">
+      <div className="w-full lg:w-96 flex flex-col gap-6 order-2 lg:order-1">
         <div className="flex items-center gap-2 mb-2">
           <Button variant="ghost" onClick={onBack} className="!px-2">
             <ArrowLeft size={20} />
@@ -144,22 +199,26 @@ export const Editor: React.FC<EditorProps> = ({ image, onBack, onImageSave }) =>
         </div>
 
         {/* Tabs */}
-        <div className="flex bg-slate-800 p-1 rounded-lg">
-          <button
-            onClick={() => setMode('canvas')}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-sm font-medium transition-all ${mode === 'canvas' ? 'bg-slate-700 text-white shadow' : 'text-slate-400 hover:text-white'}`}
-          >
-            <TypeIcon size={16} /> Text Overlay
-          </button>
-          <button
-            onClick={() => setMode('ai')}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-sm font-medium transition-all ${mode === 'ai' ? 'bg-yellow-500 text-black shadow' : 'text-slate-400 hover:text-white'}`}
-          >
-            <Wand2 size={16} /> AI Edit
-          </button>
+        <div className="flex bg-slate-800 p-1 rounded-lg overflow-x-auto">
+          {[
+            { id: 'ai', icon: Wand2, label: 'AI Edit' },
+            { id: 'filters', icon: Sliders, label: 'Filters' },
+            { id: 'canvas', icon: TypeIcon, label: 'Text' },
+            { id: 'history', icon: History, label: 'History' },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setMode(tab.id as EditorMode)}
+              className={`flex-1 min-w-[80px] flex flex-col items-center justify-center gap-1 py-2 rounded-md text-xs font-medium transition-all ${mode === tab.id ? 'bg-yellow-500 text-black shadow' : 'text-slate-400 hover:text-white hover:bg-slate-700'}`}
+            >
+              <tab.icon size={18} />
+              {tab.label}
+            </button>
+          ))}
         </div>
 
-        {mode === 'canvas' ? (
+        {/* CANVAS TEXT MODE */}
+        {mode === 'canvas' && (
           <div className="bg-slate-800 rounded-xl p-5 border border-slate-700 space-y-5 animate-fade-in">
             <div className="space-y-2">
               <label className="text-sm font-medium text-slate-400 flex items-center gap-2">
@@ -210,7 +269,45 @@ export const Editor: React.FC<EditorProps> = ({ image, onBack, onImageSave }) =>
               </>
             )}
           </div>
-        ) : (
+        )}
+
+        {/* FILTERS MODE */}
+        {mode === 'filters' && (
+          <div className="bg-slate-800 rounded-xl p-5 border border-slate-700 space-y-5 animate-fade-in">
+             <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium text-slate-300">Image Adjustments</h3>
+                <button onClick={resetFilters} className="text-xs text-yellow-500 hover:text-yellow-400">Reset</button>
+             </div>
+
+             {[
+               { label: 'Brightness', key: 'brightness', min: 0, max: 200, icon: Sun },
+               { label: 'Contrast', key: 'contrast', min: 0, max: 200, icon: Contrast },
+               { label: 'Saturation', key: 'saturate', min: 0, max: 200, icon: Palette },
+               { label: 'Grayscale', key: 'grayscale', min: 0, max: 100, icon: null },
+               { label: 'Sepia', key: 'sepia', min: 0, max: 100, icon: null },
+             ].map((filter) => (
+                <div key={filter.key} className="space-y-1">
+                  <div className="flex justify-between text-xs text-slate-400">
+                    <span className="flex items-center gap-1">
+                      {filter.icon && <filter.icon size={12}/>} {filter.label}
+                    </span>
+                    <span>{filters[filter.key as keyof typeof filters]}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={filter.min}
+                    max={filter.max}
+                    value={filters[filter.key as keyof typeof filters]}
+                    onChange={(e) => setFilters(prev => ({ ...prev, [filter.key]: Number(e.target.value) }))}
+                    className="w-full accent-yellow-500 h-1.5 bg-slate-900 rounded-lg appearance-none cursor-pointer"
+                  />
+                </div>
+             ))}
+          </div>
+        )}
+
+        {/* AI EDIT MODE */}
+        {mode === 'ai' && (
           <div className="bg-slate-800 rounded-xl p-5 border border-slate-700 space-y-5 animate-fade-in">
             <div className="space-y-2">
               <label className="text-sm font-medium text-slate-400 flex items-center gap-2">
@@ -219,7 +316,7 @@ export const Editor: React.FC<EditorProps> = ({ image, onBack, onImageSave }) =>
               <textarea
                 value={editPrompt}
                 onChange={(e) => setEditPrompt(e.target.value)}
-                placeholder="E.g., 'Make it night time', 'Add a red hat to the character', 'Turn into a sketch'..."
+                placeholder="Describe how to change the image (e.g., 'Make it snowy', 'Add a hat', 'Change background to Mars')..."
                 className="w-full h-32 bg-slate-900 border border-slate-700 rounded-lg p-3 text-white placeholder-slate-500 focus:ring-2 focus:ring-yellow-500 outline-none resize-none"
                 disabled={isProcessing}
               />
@@ -240,21 +337,56 @@ export const Editor: React.FC<EditorProps> = ({ image, onBack, onImageSave }) =>
               className="w-full"
               icon={<Wand2 size={18} />}
             >
-              {isProcessing ? 'Editing...' : 'Generate Edit'}
+              {isProcessing ? 'Thinking...' : 'Generate Edit'}
             </Button>
             
             <p className="text-xs text-slate-500 text-center">
-              This will create a new version of your image.
+              Uses Nano Banana System (Gemini 2.5) to reconstruct the image.
             </p>
           </div>
         )}
 
-        <div className="bg-slate-800 rounded-xl p-5 border border-slate-700">
-           <h3 className="text-sm font-medium text-slate-400 mb-2">Image Info</h3>
-           <p className="text-xs text-slate-300 italic p-3 bg-slate-900 rounded border border-slate-700/50 max-h-24 overflow-y-auto">
-             "{image.prompt}"
-           </p>
-        </div>
+        {/* HISTORY MODE */}
+        {mode === 'history' && (
+          <div className="bg-slate-800 rounded-xl p-4 border border-slate-700 flex-1 overflow-y-auto min-h-[300px] animate-fade-in">
+            <h3 className="text-sm font-medium text-slate-300 mb-4 sticky top-0 bg-slate-800 pb-2 border-b border-slate-700">Version History</h3>
+            
+            <div className="space-y-4 relative pl-4 border-l-2 border-slate-700 ml-2">
+               {historyLineage.map((histImg, index) => (
+                 <div key={histImg.id} className="relative">
+                   {/* Timeline Dot */}
+                   <div className={`absolute -left-[21px] top-3 w-3 h-3 rounded-full border-2 ${histImg.id === image.id ? 'bg-yellow-500 border-yellow-500' : 'bg-slate-900 border-slate-500'}`}></div>
+                   
+                   <div 
+                     onClick={() => onSelectHistoryImage?.(histImg)}
+                     className={`cursor-pointer p-3 rounded-lg border transition-all ${histImg.id === image.id ? 'bg-slate-700 border-yellow-500/50' : 'bg-slate-900 border-slate-700 hover:border-slate-600'}`}
+                   >
+                     <div className="flex gap-3">
+                       <img src={histImg.url} alt="thumbnail" className="w-16 h-16 object-cover rounded bg-black" />
+                       <div className="flex-1 min-w-0">
+                         <p className="text-xs text-slate-300 line-clamp-2 font-medium">{histImg.prompt}</p>
+                         <p className="text-[10px] text-slate-500 mt-1">{new Date(histImg.timestamp).toLocaleTimeString()}</p>
+                       </div>
+                     </div>
+                   </div>
+                 </div>
+               ))}
+               
+               {historyLineage.length === 0 && (
+                 <p className="text-xs text-slate-500 italic">No history available.</p>
+               )}
+            </div>
+          </div>
+        )}
+
+        {mode !== 'history' && (
+           <div className="bg-slate-800 rounded-xl p-5 border border-slate-700">
+             <h3 className="text-sm font-medium text-slate-400 mb-2">Original Prompt</h3>
+             <p className="text-xs text-slate-300 italic p-3 bg-slate-900 rounded border border-slate-700/50 max-h-24 overflow-y-auto">
+               "{image.prompt}"
+             </p>
+           </div>
+        )}
 
         <div className="mt-auto">
           <Button 
@@ -275,7 +407,7 @@ export const Editor: React.FC<EditorProps> = ({ image, onBack, onImageSave }) =>
              <div className="absolute inset-0 z-10 bg-black/50 backdrop-blur-sm flex items-center justify-center rounded-lg">
                 <div className="text-center">
                   <div className="w-12 h-12 border-4 border-yellow-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-                  <p className="text-yellow-500 font-medium animate-pulse">Processing Edit...</p>
+                  <p className="text-yellow-500 font-medium animate-pulse">Nano Processing...</p>
                 </div>
              </div>
           )}
