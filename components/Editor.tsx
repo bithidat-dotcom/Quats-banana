@@ -3,6 +3,7 @@ import { GeneratedImage } from '../types';
 import { Button } from './Button';
 import { Download, ArrowLeft, Move, Type as TypeIcon, Wand2, Paintbrush, Layers, AlertCircle, History, Sliders, Sun, Contrast, Palette } from 'lucide-react';
 import { editImageWithGemini } from '../services/geminiService';
+import { v4 as uuidv4 } from 'uuid';
 
 interface EditorProps {
   image: GeneratedImage;
@@ -13,8 +14,6 @@ interface EditorProps {
 }
 
 type EditorMode = 'canvas' | 'filters' | 'ai' | 'history';
-
-const generateId = () => Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 
 export const Editor: React.FC<EditorProps> = ({ image, allImages = [], onBack, onImageSave, onSelectHistoryImage }) => {
   const [mode, setMode] = useState<EditorMode>('ai');
@@ -56,8 +55,8 @@ export const Editor: React.FC<EditorProps> = ({ image, allImages = [], onBack, o
       visited.add(curr.id);
       lineage.unshift(curr);
       if (curr.parentId) {
-        const parentId = curr.parentId; // capture for closure
-        curr = allImages.find(img => img.id === parentId);
+        const pid = curr.parentId; // Renamed local variable to avoid TS shadowing error
+        curr = allImages.find(img => img.id === pid);
       } else {
         curr = undefined;
       }
@@ -159,7 +158,7 @@ export const Editor: React.FC<EditorProps> = ({ image, allImages = [], onBack, o
       const newImageUrl = await editImageWithGemini(sourceImage, editPrompt);
       
       const newImage: GeneratedImage = {
-        id: generateId(),
+        id: uuidv4(),
         url: newImageUrl,
         prompt: `Edit: ${editPrompt}`,
         aspectRatio: image.aspectRatio,

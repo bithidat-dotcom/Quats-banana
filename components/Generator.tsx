@@ -3,10 +3,7 @@ import { GeneratedImage, ASPECT_RATIOS, AspectRatio } from '../types';
 import { generateImageWithGemini } from '../services/geminiService';
 import { Button } from './Button';
 import { Wand2, AlertCircle, Ratio, Info } from 'lucide-react';
-import { v4 as uuidv4 } from 'uuid'; // We'll implement a simple ID generator if uuid is not available, but usually nice to have.
-// Since we can't install uuid, let's use a helper function below.
-
-const generateId = () => Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+import { v4 as uuidv4 } from 'uuid';
 
 interface GeneratorProps {
   onImageGenerated: (image: GeneratedImage) => void;
@@ -29,7 +26,7 @@ export const Generator: React.FC<GeneratorProps> = ({ onImageGenerated }) => {
       const imageUrl = await generateImageWithGemini(prompt, aspectRatio);
       
       const newImage: GeneratedImage = {
-        id: generateId(),
+        id: uuidv4(),
         url: imageUrl,
         prompt: prompt,
         aspectRatio,
