@@ -18,3 +18,11 @@ View your app in AI Studio: https://ai.studio/apps/drive/188c-1UAUKUgMtVUTfrckSt
 2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
 3. Run the app:
    `npm run dev`
+
+## Also in this repository
+
+**[`deep-research-agent/`](./deep-research-agent/README.md)** — a self-contained Next.js app (own `package.json`, no shared dependencies) that researches any question on the web: an LLM agent plans sub-questions, searches, reads pages in full, cross-checks claims across independent sources and returns a cited report with a confidence level.
+
+```bash
+cd deep-research-agent && npm install && npm run dev   # http://localhost:3000
+```
