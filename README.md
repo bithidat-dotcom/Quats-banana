@@ -1,28 +1,33 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+![Dolify Researcher Banner](https://i.postimg.cc/QxQy5Pcq/c09a66c7-7556-455e-9697-71f98cc5102c.png)
 
-# Run and deploy your AI Studio app
+# 🔍 Dolify Researcher
 
-This contains everything you need to run your app locally.
+> An autonomous deep-research agent designed to scour the web, synthesize complex topics, cross-verify information, and deliver comprehensive, publication-ready research reports.
 
-View your app in AI Studio: https://ai.studio/apps/drive/188c-1UAUKUgMtVUTfrckSt7O_ESBh1nb
+---
 
-## Run Locally
+## 🚀 Features
 
-**Prerequisites:**  Node.js
+* **Autonomous Multi-Step Research:** Breaks down broad queries into granular sub-questions and investigates them iteratively.
+* **Deep Web Scraping & Extraction:** Gathers relevant insights from multiple sources while filtering out noise and low-quality data.
+* **Source Verification & Citation:** Cross-references facts across sources and provides clean, structured citations.
+* **Comprehensive Synthesized Reports:** Generates well-formatted markdown reports complete with executive summaries, deep dives, and key takeaways.
+* **Modular Architecture:** Easily customizable search tools, LLM backends, and output formats.
 
+---
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## 🛠️ Tech Stack
 
-## Also in this repository
+* **Language:** Python 3.10+
+* **LLM Orchestration:** LangChain / LlamaIndex (or custom agent loop)
+* **Search APIs:** Tavily / Google Custom Search / SerpAPI
+* **Async Processing:** `asyncio` for high-performance concurrent data fetching
 
-**[`deep-research-agent/`](./deep-research-agent/README.md)** — a self-contained Next.js app (own `package.json`, no shared dependencies) that researches any question on the web: an LLM agent plans sub-questions, searches, reads pages in full, cross-checks claims across independent sources and returns a cited report with a confidence level.
+---
 
-```bash
-cd deep-research-agent && npm install && npm run dev   # http://localhost:3000
-```
+## 📦 Installation
+
+1. **Clone the repository:**
+   ```bash
+   git clone [https://github.com/your-username/dolify-researcher.git](https://github.com/your-username/dolify-researcher.git)
+   cd dolify-researcher
