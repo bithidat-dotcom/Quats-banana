@@ -55,7 +55,7 @@ export const Editor: React.FC<EditorProps> = ({ image, allImages = [], onBack, o
       visited.add(curr.id);
       lineage.unshift(curr);
       if (curr.parentId) {
-        const pid = curr.parentId; // Renamed local variable to avoid TS shadowing error
+        const pid: string = curr.parentId; // Renamed local variable to avoid TS shadowing error
         curr = allImages.find(img => img.id === pid);
       } else {
         curr = undefined;
